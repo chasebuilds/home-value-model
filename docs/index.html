@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home Value Model</title>
+<style>
+:root {
+  --wall: #cdb9a3; --wall-2: #e9ddcf; --glow: #fff6e6; --wood: #8a6447;
+  --ink: #2a2019; --ink-2: rgba(42,32,25,.68); --ink-3: rgba(42,32,25,.4);
+  --glass: rgba(255,250,244,.30); --edge: rgba(255,255,255,.6); --card: rgba(255,252,248,.58);
+  --shadow: rgba(70,40,20,.22); --accent: #e2583a; --solid: #2a2019; --solid-fg: #fbf5ee;
+  --good: #1f7a5a; --warn: #a8670f;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --wall: #2a1f19; --wall-2: #3b2c22; --glow: #ffb867; --wood: #33241a;
+  --ink: #f6ece2; --ink-2: rgba(246,236,226,.7); --ink-3: rgba(246,236,226,.4);
+  --glass: rgba(34,24,18,.38); --edge: rgba(255,255,255,.15); --card: rgba(48,36,28,.6);
+  --shadow: rgba(0,0,0,.45); --accent: #ff7a55; --solid: #f6ece2; --solid-fg: #2a2019;
+  --good: #4fd1a1; --warn: #f0b45a; color-scheme: dark; } }
+* { box-sizing: border-box }
+body { margin: 0; min-height: 100vh; color: var(--ink); font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
+  background: radial-gradient(60% 50% at 80% 10%, var(--glow), transparent 70%),
+              linear-gradient(180deg, var(--wall-2), var(--wall) 60%, var(--wood)); background-attachment: fixed }
+.wrap { max-width: 980px; margin: 0 auto; padding: 18px 16px 48px; display: flex; flex-direction: column; gap: 14px }
+.glass { background: var(--glass); -webkit-backdrop-filter: blur(24px) saturate(150%); backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid var(--edge); box-shadow: inset 0 1px 0 var(--edge), 0 24px 60px -20px var(--shadow); border-radius: 26px }
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px 8px 16px; border-radius: 999px; font-weight: 600; flex-wrap: wrap }
+.pill { font-size: 12px; padding: 6px 12px; border-radius: 999px; background: var(--solid); color: var(--solid-fg); font-weight: 500 }
+.stage { padding: clamp(18px, 3vw, 28px); display: grid; gap: 22px; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) }
+@media (max-width: 760px) { .stage { grid-template-columns: 1fr } }
+h1 { margin: 0 0 4px; font-size: clamp(24px, 3.6vw, 32px); letter-spacing: -.025em; font-weight: 600 }
+h2 { margin: 0 0 8px; font-size: 15px }
+.sub { margin: 0 0 16px; color: var(--ink-2) }
+.disc { padding: 10px 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--edge); font-size: 13px; margin-bottom: 16px }
+form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px }
+label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-2) }
+label.wide { grid-column: 1 / -1 }
+input, select { font: inherit; font-size: 14px; color: var(--ink); background: var(--card); border: 1px solid var(--edge); border-radius: 12px; padding: 8px 10px; width: 100%; min-width: 0 }
+input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px }
+.card { background: var(--card); border: 1px solid var(--edge); border-radius: 18px; padding: 16px 18px }
+.big { font-size: clamp(34px, 6vw, 46px); font-weight: 500; letter-spacing: -.03em; font-variant-numeric: tabular-nums }
+.range { color: var(--ink-2); font-variant-numeric: tabular-nums }
+.rows { margin: 12px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 13px }
+.rows li { display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid var(--edge); padding-top: 6px }
+.pos { color: var(--good) } .neg { color: var(--accent) }
+.warn { color: var(--warn); font-size: 13px; margin-top: 10px }
+.right { display: flex; flex-direction: column; gap: 14px }
+.foot { font-size: 12.5px; color: var(--ink-2); padding: 14px 18px }
+a { color: inherit }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="glass bar"><span>Chase Builds</span><span class="pill">home-value-model</span></div>
+  <main class="glass stage">
+    <section>
+      <h1>Try a home value estimate</h1>
+      <p class="sub">The hedonic model from the repo, running in your browser. It was fitted to Ames, Iowa sales (2006 to 2010), so values are Ames-scale and 2010 dollars.</p>
+      <div class="disc"><b>Not an appraisal.</b> A USPAP-compliant appraisal requires a licensed or certified appraiser. This page is an analysis and education tool.</div>
+      <form id="f">
+        <label class="wide">Neighborhood (Ames code)<select id="neighborhood"></select></label>
+        <label>Living area (sq ft)<input id="gr_liv_area" type="number" value="1650" min="300" step="10"></label>
+        <label>Lot area (sq ft)<input id="lot_area" type="number" value="9200" min="1000" step="100"></label>
+        <label>Overall quality (1-10)<input id="overall_qual" type="number" value="6" min="1" max="10"></label>
+        <label>Overall condition (1-9)<input id="overall_cond" type="number" value="5" min="1" max="9"></label>
+        <label>Year built<input id="year_built" type="number" value="1995"></label>
+        <label>Year remodeled<input id="year_remod" type="number" value="2005"></label>
+        <label>Basement (sq ft, 0 = none)<input id="total_bsmt_sf" type="number" value="900" min="0" step="10"></label>
+        <label>Bedrooms above ground<input id="bedrooms" type="number" value="3" min="0"></label>
+        <label>Full baths<input id="full_bath" type="number" value="2" min="0"></label>
+        <label>Half baths<input id="half_bath" type="number" value="1" min="0"></label>
+        <label>Garage spaces<input id="garage_cars" type="number" value="2" min="0"></label>
+        <label>Fireplaces<input id="fireplaces" type="number" value="1" min="0"></label>
+      </form>
+    </section>
+    <section class="right">
+      <div class="card" aria-live="polite">
+        <h2>Hedonic estimate</h2>
+        <div class="big" id="est">-</div>
+        <div class="range" id="rng"></div>
+        <ul class="rows" id="drivers"></ul>
+        <div class="warn" id="warn"></div>
+      </div>
+      <div class="card">
+        <h2>When to trust it</h2>
+        <p style="margin:0;font-size:13.5px">Trust it a little when the home looks ordinary for the area. Do not lean on it for unusual homes, new construction, big remodels, or anywhere outside Ames. The full tool adds a gradient-boosted model and a confidence score; run it from the command line.</p>
+      </div>
+    </section>
+  </main>
+  <div class="glass foot">Data: Ames, Iowa Assessor's Office sales as published by De Cock (2011), Journal of Statistics Education 19(3). The data is not stored in this repo. Only fitted coefficients are used here. <a href="https://github.com/chasebuilds/home-value-model">Source and model card</a>.</div>
+</div>
+<script>
+const FIELDS = ["gr_liv_area","lot_area","overall_qual","overall_cond","year_built","year_remod","total_bsmt_sf","bedrooms","full_bath","half_bath","garage_cars","fireplaces"];
+const LABELS = {log_gla:"Living area",log_lot:"Lot size",qual:"Overall quality",cond:"Overall condition",age:"Age",remod_age:"Years since remodel",has_bsmt:"Has basement",log_bsmt:"Basement size",baths:"Bathrooms",bedrooms:"Bedrooms",garage_cars:"Garage spaces",fireplaces:"Fireplaces",neighborhood:"Neighborhood"};
+let M = null, REF = null;
+const $ = id => document.getElementById(id);
+const money = v => "$" + (Math.round(v / 100) * 100).toLocaleString("en-US");
+
+function engineer(v, year) {
+  const bs = v.total_bsmt_sf;
+  return {
+    log_gla: Math.log(v.gr_liv_area), log_lot: Math.log(v.lot_area), qual: v.overall_qual, cond: v.overall_cond,
+    age: Math.max(0, year - v.year_built), remod_age: Math.max(0, year - v.year_remod),
+    has_bsmt: bs > 0 ? 1 : 0, log_bsmt: Math.log1p(bs), baths: v.full_bath + 0.5 * v.half_bath,
+    bedrooms: v.bedrooms, garage_cars: v.garage_cars, fireplaces: v.fireplaces
+  };
+}
+function read() {
+  const v = {};
+  for (const k of FIELDS) { v[k] = Number($(k).value); if (!isFinite(v[k])) return null; }
+  if (v.gr_liv_area <= 0 || v.lot_area <= 0) return null;
+  return v;
+}
+function run() {
+  if (!M) return;
+  const v = read();
+  if (!v) { $("est").textContent = "-"; $("rng").textContent = "Enter positive numbers."; return; }
+  const x = engineer(v, M.valuation_year), hood = $("neighborhood").value;
+  let ln = M.intercept + M.neighborhood[hood];
+  const eff = [];
+  for (const k in M.numeric) { ln += M.numeric[k] * x[k]; eff.push([LABELS[k], M.numeric[k] * (x[k] - REF[k])]); }
+  const hv = Object.values(M.neighborhood), mean = hv.reduce((a, b) => a + b, 0) / hv.length;
+  eff.push([LABELS.neighborhood, M.neighborhood[hood] - mean]);
+  const est = Math.exp(ln), hw = M.range_half_width;
+  $("est").textContent = money(est);
+  $("rng").textContent = "80% range " + money(est * Math.exp(-hw)) + " to " + money(est * Math.exp(hw));
+  eff.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  $("drivers").innerHTML = eff.slice(0, 5).map(([n, e]) => {
+    const p = 100 * (Math.exp(e) - 1);
+    return `<li><span>${n} vs a typical home</span><b class="${p >= 0 ? "pos" : "neg"}">${p >= 0 ? "+" : ""}${p.toFixed(1)}%</b></li>`;
+  }).join("");
+  const out = [];
+  for (const k in x) { const b = M.bounds[k]; if (b && (x[k] < b[0] || x[k] > b[1])) out.push((LABELS[k] || k).toLowerCase()); }
+  $("warn").textContent = out.length ? "Unusual for the training data: " + out.join(", ") + ". Treat this estimate with extra caution." : "";
+}
+fetch("model.json").then(r => r.json()).then(m => {
+  M = m;
+  REF = m.reference;
+  const sel = $("neighborhood");
+  Object.keys(m.neighborhood).sort().forEach(h => sel.add(new Option(h, h)));
+  sel.value = "NAmes";
+  run();
+}).catch(() => { $("est").textContent = "model.json did not load"; });
+document.getElementById("f").addEventListener("input", run);
+$("neighborhood").addEventListener("change", run);
+</script>
+</body>
+</html>
