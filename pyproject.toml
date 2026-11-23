@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "home-value-model"
-version = "0.1.0"
+version = "0.2.0"
 description = "An automated valuation model (AVM) done honestly: hedonic + gradient boosting, time split, industry metrics, confidence score."
 readme = "README.md"
 requires-python = ">=3.11"

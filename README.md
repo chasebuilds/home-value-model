@@ -3,13 +3,15 @@
 [![ci](https://github.com/chasebuilds/home-value-model/actions/workflows/ci.yml/badge.svg)](https://github.com/chasebuilds/home-value-model/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-An automated valuation model (AVM) done honestly: two models, a time-based test on later sales, the standard AVM accuracy metrics, and a confidence score that says when not to trust an estimate.
+**An automated valuation model (AVM) that tells you how far to trust each number.** Give it a home's basic facts, or a CSV of hundreds, and it returns an estimate, an 80% value range, a 0 to 100 confidence score and plain-English warnings. It is tested on later sales it never saw, using the metrics lenders and assessors use (MdAPE, PPE10, FSD, COD).
+
+**Live demo:** <https://chasebuilds.github.io/home-value-model/> (runs in your browser, nothing is uploaded)
+
+![Screenshot of the demo page](docs/screenshot.jpg)
 
 > **Not an appraisal.** This is an analysis and education tool. A USPAP-compliant appraisal requires a licensed or certified appraiser.
 
-**Live demo:** <https://chasebuilds.github.io/home-value-model/> (the hedonic model running in your browser)
-
-![Screenshot of the demo page](docs/screenshot.jpg)
+**Held-out result on 718 real Ames sales:** median error 6.0%, 72.4% of estimates within 10% of the sale price, against 11.6% and 43.0% for a neighborhood price-per-square-foot rule. Full table and a re-runnable [BENCHMARK.md](BENCHMARK.md) below.
 
 ## What it does
 
@@ -43,7 +45,16 @@ Biggest price drivers vs a typical home (hedonic model):
   ...
 ```
 
-`avm predict` also takes `--json`. The subject file lists 12 numeric fields and a neighborhood (see [examples/subject.json](examples/subject.json)); `valuation_year` is optional and sets the age basis.
+`avm predict` also takes `--json`.
+
+### Value a whole list, and print a one-page report
+
+```powershell
+.venv\Scriptsvm batch examples/subjects.csv --out estimates.csv
+.venv\Scriptsvm report examples/subject.json --out report.html
+```
+
+`avm batch` values every row of a CSV. Bad rows do not stop the run: they are skipped and listed with a reason in `estimates_skipped.csv` (non-numeric or out-of-range inputs, blank fields). Fixable oddities are repaired and noted in a `notes` column: a blank remodel year means "never remodeled", and a remodel year before the build year is replaced with the build year. Headers are matched loosely (`Gr Liv Area` works), and an optional `valuation_year` column sets the age basis per row. [examples/subjects.csv](examples/subjects.csv) is a small made-up file with four deliberate problems. `avm report` writes a standalone HTML page (no scripts, prints cleanly) with the estimate, range, confidence, warnings, drivers and the disclaimer. The subject file lists 12 numeric fields and a neighborhood (see [examples/subject.json](examples/subject.json)); `valuation_year` is optional and sets the age basis.
 
 ## Model card
 
@@ -108,8 +119,9 @@ An estimate is a starting point for a human who knows the market. It never repla
 ## Layout
 
 ```
-src/home_value_model/   data.py features.py model.py metrics.py report.py cli.py
-tests/                  22 tests (metrics, split, models, confidence, CLI, loader)
+src/home_value_model/   data.py features.py model.py metrics.py report.py batch.py cli.py
+scripts/benchmark.py    regenerates BENCHMARK.md from measured runs
+tests/                  34 tests (metrics, split, models, confidence, CLI, loader, batch, report)
 data/sample_synthetic.csv   600 seeded fake homes, used by tests and CI (no network)
 docs/                   demo page, hedonic coefficients, saved results, screenshot
 examples/subject.json   a sample subject property

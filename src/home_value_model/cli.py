@@ -1,4 +1,4 @@
-"""Command line: avm train | predict | synth | fetch."""
+"""Command line: avm train | predict | batch | report | synth | fetch."""
 
 from __future__ import annotations
 
@@ -11,37 +11,17 @@ from typing import Any
 import pandas as pd
 
 from . import __version__
+from .batch import DISCLAIMER, html_report, trust_text, value_table
 from .data import NUMERIC, fetch_ames, load_ames, synthetic, time_split
 from .features import DEFAULT_VALUATION_YEAR, REQUIRED
 from .model import AVM
 from .report import evaluate, page_model
 
-DISCLAIMER = (
-    "This is a statistical estimate, not an appraisal. A USPAP-compliant appraisal "
-    "requires a licensed or certified appraiser."
-)
 DEFAULT_MODEL = Path("models/avm.joblib")
 
 
 def _pct(x: float) -> str:
     return f"{100 * x:.1f}%"
-
-
-def trust_text(row: pd.Series) -> str:
-    """Plain-English guidance for one estimate."""
-    band = row["confidence_band"]
-    lines = {
-        "high": "This home looks like many homes the model has seen, and both models agree. "
-        "Typical error on homes like this was small in testing, but it is still an estimate.",
-        "medium": "Usable as a rough starting point. Check it against recent sales of similar "
-        "homes before relying on it.",
-        "low": "Do not rely on this number. The home is unusual, the two models disagree, or "
-        "the data is thin for it. Use it only as a sanity check on a real valuation.",
-    }
-    text = lines[band]
-    if row["flags"]:
-        text += " Warnings: " + "; ".join(row["flags"]) + "."
-    return text
 
 
 def read_subject(path: Path) -> tuple[pd.DataFrame, int]:
@@ -83,17 +63,14 @@ def cmd_train(args: argparse.Namespace) -> int:
 
 
 def cmd_predict(args: argparse.Namespace) -> int:
-    path = Path(args.model)
-    if not path.exists():
-        raise SystemExit(f"no model at {path}. Run: avm train --source synthetic (or ames)")
-    model = AVM.load(path)
+    model = _load_model(args.model)
     subject, year = read_subject(Path(args.subject))
     res = model.predict(subject, year).iloc[0]
     drivers = model.drivers(subject)
     if args.json:
         payload = {k: (v.item() if hasattr(v, "item") else v) for k, v in res.items()}
         payload["drivers"] = drivers
-        payload["trust"] = trust_text(res)
+        payload["trust"] = trust_text(res["confidence_band"], res["flags"])
         payload["disclaimer"] = DISCLAIMER
         print(json.dumps(payload, indent=2))
         return 0
@@ -105,8 +82,41 @@ def cmd_predict(args: argparse.Namespace) -> int:
     print("Biggest price drivers vs a typical home (hedonic model):")
     for d in drivers:
         print(f"  {d['feature']:22s} {d['effect_pct']:+.1f}%")
-    print(trust_text(res))
+    print(trust_text(res["confidence_band"], res["flags"]))
     print(DISCLAIMER)
+    return 0
+
+
+def _load_model(path_str: str) -> AVM:
+    path = Path(path_str)
+    if not path.exists():
+        raise SystemExit(f"no model at {path}. Run: avm train --source synthetic (or ames)")
+    return AVM.load(path)
+
+
+def cmd_batch(args: argparse.Namespace) -> int:
+    model = _load_model(args.model)
+    raw = pd.read_csv(args.input, dtype=str)
+    try:
+        results, problems = value_table(model, raw)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    out = Path(args.out)
+    results.to_csv(out, index=False)
+    print(f"valued {len(results)} of {len(raw)} rows, wrote {out}")
+    if len(problems):
+        prob_path = out.with_name(out.stem + "_skipped.csv")
+        problems.to_csv(prob_path, index=False)
+        print(f"skipped {len(problems)} rows, reasons in {prob_path}")
+    print(DISCLAIMER)
+    return 0
+
+
+def cmd_report(args: argparse.Namespace) -> int:
+    model = _load_model(args.model)
+    subject, year = read_subject(Path(args.subject))
+    Path(args.out).write_text(html_report(model, subject, year), encoding="utf-8")
+    print(f"wrote {args.out}")
     return 0
 
 
@@ -143,6 +153,18 @@ def main(argv: list[str] | None = None) -> int:
     q.add_argument("--model", default=str(DEFAULT_MODEL))
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_predict)
+
+    b = sub.add_parser("batch", help="value every row of a CSV of subject properties")
+    b.add_argument("input")
+    b.add_argument("--model", default=str(DEFAULT_MODEL))
+    b.add_argument("--out", default="estimates.csv")
+    b.set_defaults(func=cmd_batch)
+
+    r = sub.add_parser("report", help="write a one-page HTML analysis of one subject")
+    r.add_argument("subject")
+    r.add_argument("--model", default=str(DEFAULT_MODEL))
+    r.add_argument("--out", default="report.html")
+    r.set_defaults(func=cmd_report)
 
     s = sub.add_parser("synth", help="write a seeded synthetic data set")
     s.add_argument("--n", type=int, default=600)
