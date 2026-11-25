@@ -1,0 +1,7 @@
+{
+  "title": "Home Value Model: Honest automated valuation with AVM metrics | Chase Builds",
+  "description": "Automated valuation model done honestly: hedonic and gradient boosting on public housing data, time split, AVM metrics and a confidence score. Not an appraisal.",
+  "url": "https://chasebuilds.github.io/home-value-model/",
+  "image": "docs/demo.png",
+  "repo": "home-value-model"
+}
